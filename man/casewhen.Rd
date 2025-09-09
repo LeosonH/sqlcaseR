@@ -4,25 +4,43 @@
 \alias{casewhen}
 \title{Generate a SQL CASE statement from a mapping file}
 \usage{
-casewhen(inputfile = NULL, header = FALSE)
+casewhen(
+  inputfile = NULL,
+  header = FALSE,
+  when_col = 1,
+  then_col = 2,
+  else_value = NULL,
+  quote_type = "single",
+  handle_nulls = "skip"
+)
 }
 \arguments{
 \item{inputfile}{Mapping dataframe OR path to the mapping file}
 
 \item{header}{If reading a csv file, TRUE if the file includes a header row,
 FALSE if it does not include a header row.}
+
+\item{when_col}{Column name or index for WHEN values (default: 1)}
+
+\item{then_col}{Column name or index for THEN values (default: 2)}
+
+\item{else_value}{Optional ELSE value for the CASE statement}
+
+\item{quote_type}{Type of quotes to use: "single", "double", or "auto" (default: "single")}
+
+\item{handle_nulls}{How to handle NULL/NA values: "skip", "null", or "error" (default: "skip")}
 }
 \value{
 A string that represents the constructed CASE statement
 }
 \description{
-This function constructs a CASE..WHEN,,THEN statement from a mapping file or
-dataframe. It assumes that the first column of the mapping data contains the
-original WHEN values, and the second column contains the THEN values (the
-values to be mapped to.)
+This function constructs a CASE..WHEN..THEN statement from a mapping file or
+dataframe. By default, it uses the first column for WHEN values and second
+column for THEN values, but you can specify different columns.
 }
 \examples{
- input <- Data_Frame <- data.frame(Training = c("Strength", "Stamina",
-  "Other"), Duration = c(60, 30, 45))
- result <- casewhen(inputfile = input, header = TRUE)
+ input <- data.frame(Training = c("Strength", "Stamina", "Other"), 
+                     Duration = c(60, 30, 45))
+ result <- casewhen(inputfile = input, when_col = "Training", 
+                    then_col = "Duration", else_value = "Unknown")
 }

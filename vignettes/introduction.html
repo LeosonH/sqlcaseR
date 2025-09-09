@@ -49,7 +49,7 @@ overflow: visible;
 </style>
 <style type="text/css" data-origin="pandoc">
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span { line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -60,7 +60,7 @@ div.sourceCode { overflow: auto; }
 }
 @media print {
 pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
 }
 pre.numberSource code
 { counter-reset: source-line 0; }
@@ -341,8 +341,9 @@ statements for SQL interfaces in R</h1>
 
 
 
-<p><strong>Version 0.1.3</strong></p>
-<p><strong><em>Leoson Hoay <br>15 Jan 2023</em></strong></p>
+<p><strong>Version 0.2.1</strong></p>
+<p><strong><em>Leoson Hoay <br>Last Updated: 8 Sep 2025 (0.2.0 -&gt;
+0.2.1)</em></strong></p>
 <div id="introduction" class="section level2">
 <h2>Introduction</h2>
 <p>This module was born out of my genuine frustration while constructing
@@ -350,11 +351,15 @@ an extremely long CASE WHEN…THEN statement to re-label categorical
 variables. It is most helpful for folks who intend to work with SQL
 directly in the R environment, likely with a SQL connector such as RODBC
 or RSQLite.</p>
-<p>Instead of manually inputting WHENs and THENs to replace/map values,
-this library does it for you if you provide it with a mapping CSV file
-that contains the original values in the first column, and the values to
-map to in the second column. This version only supports CSV files for
-now, but support for other file formats is planned.</p>
+<p>The package provides three main functions for generating SQL
+statements: - <strong><code>casewhen()</code></strong> - Creates CASE
+WHEN…THEN statements for value mapping -
+<strong><code>inlist()</code></strong> - Creates IN() statements for
+filtering - <strong><code>updatetable()</code></strong> - Creates UPDATE
+statements for bulk data updates</p>
+<p>All functions now support flexible column selection, robust error
+handling, different quote types, and various options for handling
+NULL/NA values.</p>
 <p><br> Go from this:</p>
 <table>
 <tbody>
@@ -391,125 +396,255 @@ now, but support for other file formats is planned.</p>
  WHEN &#39;N/A&#39; THEN &#39;Not Homeless&#39;
  WHEN &#39;No&#39; THEN &#39;Not Homeless&#39;
  WHEN &#39;Homeless, Doubled-Up&#39; THEN &#39;Doubled Up&#39;</code></pre>
-<p>As of version 0.1.3, the package also supports the creation of long
-SQL IN() lists via the <em>inlist()</em> function. This was inspired by
+<p>The package also supports the creation of long SQL IN() lists via the
+<em>inlist()</em> function, and UPDATE statements via the
+<em>updatetable()</em> function. The IN() functionality was inspired by
 reading about Kevin Flerlage’s <a href="https://www.flerlagetwins.com/2020/09/in-operator-generator-case-statement.html">Excel
 implementation</a>.</p>
 </div>
 <div id="demonstration" class="section level2">
 <h2>Demonstration</h2>
-<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(sqlcaser)</span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">library</span>(sqlcaser)</span></code></pre></div>
 <p>The package assumes that the user has a mapping CSV file or an R
 dataframe similar to the example below:</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>samp <span class="ot">&lt;-</span> <span class="fu">system.file</span>(<span class="st">&quot;extdata&quot;</span>, <span class="st">&quot;sample.csv&quot;</span>, <span class="at">package =</span> <span class="st">&quot;sqlcaser&quot;</span>)</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>mapping <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(samp)</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>mapping</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;             Homeless..Hotel.or.Motel Living.in.Shelter.Hotel.Motel</span></span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 1              Homeless, Hotel/Motel Living in Shelter/Hotel/Motel</span></span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 2        Homeless, Living in Shelter Living in Shelter/Hotel/Motel</span></span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 3                  Homeless Shelters Living in Shelter/Hotel/Motel</span></span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 4                        Hotel/motel Living in Shelter/Hotel/Motel</span></span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 5                        Hotel/Motel Living in Shelter/Hotel/Motel</span></span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 6                   Homeless Shelter Living in Shelter/Hotel/Motel</span></span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 7     Homeless Status Not Applicable                  Not Homeless</span></span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 8                                N/A                  Not Homeless</span></span>
-<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 9                                 No                  Not Homeless</span></span>
-<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 10              Homeless, Doubled-Up                    Doubled Up</span></span>
-<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 11 Homeless, In Doubled-Up Residence                    Doubled Up</span></span>
-<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 12             Homeless, Unsheltered                   Unsheltered</span></span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>samp <span class="ot">&lt;-</span> <span class="fu">system.file</span>(<span class="st">&quot;extdata&quot;</span>, <span class="st">&quot;sample.csv&quot;</span>, <span class="at">package =</span> <span class="st">&quot;sqlcaser&quot;</span>)</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>mapping <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(samp)</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>mapping</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a><span class="co">#&gt;             Homeless..Hotel.or.Motel Living.in.Shelter.Hotel.Motel</span></span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a><span class="co">#&gt; 1              Homeless, Hotel/Motel Living in Shelter/Hotel/Motel</span></span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a><span class="co">#&gt; 2        Homeless, Living in Shelter Living in Shelter/Hotel/Motel</span></span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a><span class="co">#&gt; 3                  Homeless Shelters Living in Shelter/Hotel/Motel</span></span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a><span class="co">#&gt; 4                        Hotel/motel Living in Shelter/Hotel/Motel</span></span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a><span class="co">#&gt; 5                        Hotel/Motel Living in Shelter/Hotel/Motel</span></span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a><span class="co">#&gt; 6                   Homeless Shelter Living in Shelter/Hotel/Motel</span></span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a><span class="co">#&gt; 7     Homeless Status Not Applicable                  Not Homeless</span></span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a><span class="co">#&gt; 8                                N/A                  Not Homeless</span></span>
+<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a><span class="co">#&gt; 9                                 No                  Not Homeless</span></span>
+<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a><span class="co">#&gt; 10              Homeless, Doubled-Up                    Doubled Up</span></span>
+<span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a><span class="co">#&gt; 11 Homeless, In Doubled-Up Residence                    Doubled Up</span></span>
+<span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a><span class="co">#&gt; 12             Homeless, Unsheltered                   Unsheltered</span></span></code></pre></div>
 <p>The function <strong>casewhen()</strong> takes an <strong><em>R
 dataframe or the file path of the mapping file</em></strong> as
 input,and returns the CASE statement as a string, while printing it to
 the console as well.</p>
-<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>statement <span class="ot">&lt;-</span> <span class="fu">casewhen</span>(samp)</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; CASE WHEN &#39;Homeless, Hotel or Motel&#39; THEN &#39;Living in Shelter/Hotel/Motel&#39;</span></span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless, Hotel/Motel&#39; THEN &#39;Living in Shelter/Hotel/Motel&#39;</span></span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless, Living in Shelter&#39; THEN &#39;Living in Shelter/Hotel/Motel&#39;</span></span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless Shelters&#39; THEN &#39;Living in Shelter/Hotel/Motel&#39;</span></span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Hotel/motel&#39; THEN &#39;Living in Shelter/Hotel/Motel&#39;</span></span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Hotel/Motel&#39; THEN &#39;Living in Shelter/Hotel/Motel&#39;</span></span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless Shelter&#39; THEN &#39;Living in Shelter/Hotel/Motel&#39;</span></span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless Status Not Applicable&#39; THEN &#39;Not Homeless&#39;</span></span>
-<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;N/A&#39; THEN &#39;Not Homeless&#39;</span></span>
-<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;No&#39; THEN &#39;Not Homeless&#39;</span></span>
-<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless, Doubled-Up&#39; THEN &#39;Doubled Up&#39;</span></span>
-<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless, In Doubled-Up Residence&#39; THEN &#39;Doubled Up&#39;</span></span>
-<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless, Unsheltered&#39; THEN &#39;Unsheltered&#39;</span></span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>statement <span class="ot">&lt;-</span> <span class="fu">casewhen</span>(samp)</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="co">#&gt; CASE WHEN &#39;Homeless, Hotel or Motel&#39; THEN &#39;Living in Shelter/Hotel/Motel&#39;</span></span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless, Hotel/Motel&#39; THEN &#39;Living in Shelter/Hotel/Motel&#39;</span></span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless, Living in Shelter&#39; THEN &#39;Living in Shelter/Hotel/Motel&#39;</span></span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless Shelters&#39; THEN &#39;Living in Shelter/Hotel/Motel&#39;</span></span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Hotel/motel&#39; THEN &#39;Living in Shelter/Hotel/Motel&#39;</span></span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Hotel/Motel&#39; THEN &#39;Living in Shelter/Hotel/Motel&#39;</span></span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless Shelter&#39; THEN &#39;Living in Shelter/Hotel/Motel&#39;</span></span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless Status Not Applicable&#39; THEN &#39;Not Homeless&#39;</span></span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;N/A&#39; THEN &#39;Not Homeless&#39;</span></span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;No&#39; THEN &#39;Not Homeless&#39;</span></span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless, Doubled-Up&#39; THEN &#39;Doubled Up&#39;</span></span>
+<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless, In Doubled-Up Residence&#39; THEN &#39;Doubled Up&#39;</span></span>
+<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless, Unsheltered&#39; THEN &#39;Unsheltered&#39;</span></span></code></pre></div>
 <p>The user can then easily include it as part of the SQL query:</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>query <span class="ot">&lt;-</span> <span class="fu">paste</span>(<span class="st">&quot;SELECT id, &quot;</span>, statement, <span class="st">&quot; END AS status &quot;</span>,<span class="st">&quot; </span><span class="sc">\n</span><span class="st">FROM table;&quot;</span>)</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(query)</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; SELECT id,  </span></span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; CASE WHEN &#39;Homeless, Hotel or Motel&#39; THEN &#39;Living in Shelter/Hotel/Motel&#39;</span></span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless, Hotel/Motel&#39; THEN &#39;Living in Shelter/Hotel/Motel&#39;</span></span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless, Living in Shelter&#39; THEN &#39;Living in Shelter/Hotel/Motel&#39;</span></span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless Shelters&#39; THEN &#39;Living in Shelter/Hotel/Motel&#39;</span></span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Hotel/motel&#39; THEN &#39;Living in Shelter/Hotel/Motel&#39;</span></span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Hotel/Motel&#39; THEN &#39;Living in Shelter/Hotel/Motel&#39;</span></span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless Shelter&#39; THEN &#39;Living in Shelter/Hotel/Motel&#39;</span></span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless Status Not Applicable&#39; THEN &#39;Not Homeless&#39;</span></span>
-<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;N/A&#39; THEN &#39;Not Homeless&#39;</span></span>
-<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;No&#39; THEN &#39;Not Homeless&#39;</span></span>
-<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless, Doubled-Up&#39; THEN &#39;Doubled Up&#39;</span></span>
-<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless, In Doubled-Up Residence&#39; THEN &#39;Doubled Up&#39;</span></span>
-<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless, Unsheltered&#39; THEN &#39;Unsheltered&#39;</span></span>
-<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   </span><span class="re">END</span><span class="co"> AS status   </span></span>
-<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; FROM table;</span></span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>query <span class="ot">&lt;-</span> <span class="fu">paste</span>(<span class="st">&quot;SELECT id, &quot;</span>, statement, <span class="st">&quot; END AS status &quot;</span>,<span class="st">&quot; </span><span class="sc">\n</span><span class="st">FROM table;&quot;</span>)</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="fu">cat</span>(query)</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="co">#&gt; SELECT id,  </span></span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="co">#&gt; CASE WHEN &#39;Homeless, Hotel or Motel&#39; THEN &#39;Living in Shelter/Hotel/Motel&#39;</span></span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless, Hotel/Motel&#39; THEN &#39;Living in Shelter/Hotel/Motel&#39;</span></span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless, Living in Shelter&#39; THEN &#39;Living in Shelter/Hotel/Motel&#39;</span></span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless Shelters&#39; THEN &#39;Living in Shelter/Hotel/Motel&#39;</span></span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Hotel/motel&#39; THEN &#39;Living in Shelter/Hotel/Motel&#39;</span></span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Hotel/Motel&#39; THEN &#39;Living in Shelter/Hotel/Motel&#39;</span></span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless Shelter&#39; THEN &#39;Living in Shelter/Hotel/Motel&#39;</span></span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless Status Not Applicable&#39; THEN &#39;Not Homeless&#39;</span></span>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;N/A&#39; THEN &#39;Not Homeless&#39;</span></span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;No&#39; THEN &#39;Not Homeless&#39;</span></span>
+<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless, Doubled-Up&#39; THEN &#39;Doubled Up&#39;</span></span>
+<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless, In Doubled-Up Residence&#39; THEN &#39;Doubled Up&#39;</span></span>
+<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Homeless, Unsheltered&#39; THEN &#39;Unsheltered&#39;</span></span>
+<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a><span class="co">#&gt;   </span><span class="re">END</span><span class="co"> AS status   </span></span>
+<span id="cb5-18"><a href="#cb5-18" tabindex="-1"></a><span class="co">#&gt; FROM table;</span></span></code></pre></div>
+</div>
+<div id="advanced-examples" class="section level2">
+<h2>Advanced Examples</h2>
+<div id="using-named-columns-and-else-clause" class="section level3">
+<h3>Using Named Columns and ELSE Clause</h3>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="co"># Create sample data with named columns</span></span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>data <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="at">status =</span> <span class="fu">c</span>(<span class="st">&quot;Active&quot;</span>, <span class="st">&quot;Inactive&quot;</span>, <span class="st">&quot;Pending&quot;</span>),</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="at">display =</span> <span class="fu">c</span>(<span class="st">&quot;Currently Active&quot;</span>, <span class="st">&quot;Not Active&quot;</span>, <span class="st">&quot;Under Review&quot;</span>)</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>)</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a></span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a><span class="co"># Use column names instead of positions, add ELSE clause</span></span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>advanced_case <span class="ot">&lt;-</span> <span class="fu">casewhen</span>(data, </span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>                         <span class="at">when_col =</span> <span class="st">&quot;status&quot;</span>, </span>
+<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a>                         <span class="at">then_col =</span> <span class="st">&quot;display&quot;</span>,</span>
+<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a>                         <span class="at">else_value =</span> <span class="st">&quot;Unknown Status&quot;</span>)</span>
+<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a><span class="co">#&gt; CASE WHEN &#39;Active&#39; THEN &#39;Currently Active&#39;</span></span>
+<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Inactive&#39; THEN &#39;Not Active&#39;</span></span>
+<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;Pending&#39; THEN &#39;Under Review&#39;</span></span>
+<span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a><span class="co">#&gt;  ELSE &#39;Unknown Status&#39;</span></span></code></pre></div>
+</div>
+<div id="working-with-numeric-data-and-auto-quoting" class="section level3">
+<h3>Working with Numeric Data and Auto-Quoting</h3>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="co"># Create data with numeric values</span></span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>scores <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  <span class="at">grade =</span> <span class="fu">c</span>(<span class="st">&quot;A&quot;</span>, <span class="st">&quot;B&quot;</span>, <span class="st">&quot;C&quot;</span>),</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>  <span class="at">points =</span> <span class="fu">c</span>(<span class="dv">90</span>, <span class="dv">80</span>, <span class="dv">70</span>)</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>)</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a></span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a><span class="co"># Auto-quote mode handles numeric values without quotes</span></span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>numeric_case <span class="ot">&lt;-</span> <span class="fu">casewhen</span>(scores, </span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>                        <span class="at">when_col =</span> <span class="st">&quot;grade&quot;</span>, </span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a>                        <span class="at">then_col =</span> <span class="st">&quot;points&quot;</span>,</span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a>                        <span class="at">quote_type =</span> <span class="st">&quot;auto&quot;</span>)</span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a><span class="co">#&gt; CASE WHEN &#39;A&#39; THEN 90</span></span>
+<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;B&#39; THEN 80</span></span>
+<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a><span class="co">#&gt;  WHEN &#39;C&#39; THEN 70</span></span></code></pre></div>
+</div>
+<div id="creating-in-lists-with-duplicate-removal" class="section level3">
+<h3>Creating IN Lists with Duplicate Removal</h3>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="co"># Create sample data with duplicates</span></span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>categories <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>  <span class="at">category =</span> <span class="fu">c</span>(<span class="st">&quot;Sales&quot;</span>, <span class="st">&quot;Marketing&quot;</span>, <span class="st">&quot;Sales&quot;</span>, <span class="st">&quot;IT&quot;</span>, <span class="st">&quot;Marketing&quot;</span>, <span class="st">&quot;HR&quot;</span>)</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>)</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a></span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a><span class="co"># Remove duplicates automatically</span></span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>unique_list <span class="ot">&lt;-</span> <span class="fu">inlist</span>(categories, </span>
+<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>                     <span class="at">value_col =</span> <span class="st">&quot;category&quot;</span>,</span>
+<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a>                     <span class="at">distinct =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a><span class="co">#&gt; Removed 2 duplicate values.</span></span>
+<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a><span class="co">#&gt; IN(&#39;Sales&#39;, &#39;Marketing&#39;, &#39;IT&#39;, &#39;HR&#39;)</span></span></code></pre></div>
+</div>
+<div id="bulk-update-statements" class="section level3">
+<h3>Bulk UPDATE Statements</h3>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="co"># Create sample update data</span></span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>updates <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>  <span class="at">id =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>),</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>  <span class="at">name =</span> <span class="fu">c</span>(<span class="st">&quot;John Doe&quot;</span>, <span class="st">&quot;Jane Smith&quot;</span>, <span class="st">&quot;Bob Wilson&quot;</span>),</span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>  <span class="at">department =</span> <span class="fu">c</span>(<span class="st">&quot;Engineering&quot;</span>, <span class="st">&quot;Sales&quot;</span>, <span class="st">&quot;Marketing&quot;</span>),</span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>  <span class="at">salary =</span> <span class="fu">c</span>(<span class="dv">75000</span>, <span class="dv">65000</span>, <span class="dv">60000</span>)</span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a>)</span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a></span>
+<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a><span class="co"># Generate UPDATE statements using ID as key</span></span>
+<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a>update_statements <span class="ot">&lt;-</span> <span class="fu">updatetable</span>(updates, </span>
+<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a>                                <span class="at">tablename =</span> <span class="st">&quot;employees&quot;</span>,</span>
+<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a>                                <span class="at">key_col =</span> <span class="st">&quot;id&quot;</span>)</span>
+<span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb9-14"><a href="#cb9-14" tabindex="-1"></a><span class="co">#&gt; UPDATE employees</span></span>
+<span id="cb9-15"><a href="#cb9-15" tabindex="-1"></a><span class="co">#&gt; SET name = &#39;John Doe&#39;, department = &#39;Engineering&#39;, salary = 75000</span></span>
+<span id="cb9-16"><a href="#cb9-16" tabindex="-1"></a><span class="co">#&gt; WHERE id = 1;</span></span>
+<span id="cb9-17"><a href="#cb9-17" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb9-18"><a href="#cb9-18" tabindex="-1"></a><span class="co">#&gt; UPDATE employees</span></span>
+<span id="cb9-19"><a href="#cb9-19" tabindex="-1"></a><span class="co">#&gt; SET name = &#39;Jane Smith&#39;, department = &#39;Sales&#39;, salary = 65000</span></span>
+<span id="cb9-20"><a href="#cb9-20" tabindex="-1"></a><span class="co">#&gt; WHERE id = 2;</span></span>
+<span id="cb9-21"><a href="#cb9-21" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb9-22"><a href="#cb9-22" tabindex="-1"></a><span class="co">#&gt; UPDATE employees</span></span>
+<span id="cb9-23"><a href="#cb9-23" tabindex="-1"></a><span class="co">#&gt; SET name = &#39;Bob Wilson&#39;, department = &#39;Marketing&#39;, salary = 60000</span></span>
+<span id="cb9-24"><a href="#cb9-24" tabindex="-1"></a><span class="co">#&gt; WHERE id = 3;</span></span></code></pre></div>
+</div>
 </div>
 <div id="sample-data" class="section level2">
 <h2>Sample Data</h2>
 <p>A sample mapping file is provided in this package. The file path can
 be accessed as follows:</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>samplepath <span class="ot">&lt;-</span> <span class="fu">system.file</span>(<span class="st">&quot;extdata&quot;</span>, <span class="st">&quot;sample.csv&quot;</span>, <span class="at">package =</span> <span class="st">&quot;sqlcaser&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>samplepath <span class="ot">&lt;-</span> <span class="fu">system.file</span>(<span class="st">&quot;extdata&quot;</span>, <span class="st">&quot;sample.csv&quot;</span>, <span class="at">package =</span> <span class="st">&quot;sqlcaser&quot;</span>)</span></code></pre></div>
 </div>
-<div id="functions" class="section level2">
-<h2>Functions</h2>
-<p><strong><em>casewhen()</em></strong></p>
-<p><strong>description</strong></p>
-<p>This function constructs a CASE WHEN THEN statement from a mapping
-CSV file or R dataframe It assumes that the first column of the data
-contains the original WHEN values, and the second column contains the
-THEN values (the values to be mapped to.)</p>
+<div id="function-reference" class="section level2">
+<h2>Function Reference</h2>
+<div id="casewhen---case-statement-generator" class="section level3">
+<h3><code>casewhen()</code> - CASE Statement Generator</h3>
+<p><strong>Description</strong></p>
+<p>Constructs CASE WHEN…THEN statements from mapping data with flexible
+column selection and robust options.</p>
 <p><strong>Usage</strong></p>
-<p>casewhen(inputfile=NULL, header=FALSE)</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="fu">casewhen</span>(<span class="at">inputfile =</span> <span class="cn">NULL</span>, <span class="at">header =</span> <span class="cn">FALSE</span>, <span class="at">when_col =</span> <span class="dv">1</span>, <span class="at">then_col =</span> <span class="dv">2</span>, </span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>         <span class="at">else_value =</span> <span class="cn">NULL</span>, <span class="at">quote_type =</span> <span class="st">&quot;single&quot;</span>, <span class="at">handle_nulls =</span> <span class="st">&quot;skip&quot;</span>)</span></code></pre></div>
 <p><strong>Arguments</strong></p>
-<p><em>inputfile</em> R dataframe or path to the mapping file</p>
-<p><em>header</em> If reading a CSV file, specify TRUE if there is a
-header row, FALSE if there is no header row.</p>
-<p><strong>Value</strong></p>
-<p>A string that represents the constructed CASE statement</p>
-<p><br> <strong><em>inlist()</em></strong></p>
-<p><strong>description</strong></p>
-<p>This function constructs a CASE WHEN THEN statement from a mapping
-CSV file or R dataframe It assumes that the first column of the data
-contains the original WHEN values, and the second column contains the
-THEN values (the values to be mapped to.)</p>
+<ul>
+<li><code>inputfile</code> - R dataframe or path to mapping file</li>
+<li><code>when_col</code> - Column name/index for WHEN values (default:
+1)</li>
+<li><code>then_col</code> - Column name/index for THEN values (default:
+2)<br />
+</li>
+<li><code>else_value</code> - Optional ELSE value for the CASE
+statement</li>
+<li><code>quote_type</code> - “single”, “double”, or “auto” (default:
+“single”)</li>
+<li><code>handle_nulls</code> - “skip”, “null”, or “error” (default:
+“skip”)</li>
+</ul>
+</div>
+<div id="inlist---in-statement-generator" class="section level3">
+<h3><code>inlist()</code> - IN Statement Generator</h3>
+<p><strong>Description</strong></p>
+<p>Creates SQL IN() statements with duplicate removal and flexible
+column selection.</p>
 <p><strong>Usage</strong></p>
-<p>inlist(inputfile=NULL, header=FALSE)</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="fu">inlist</span>(<span class="at">inputfile =</span> <span class="cn">NULL</span>, <span class="at">header =</span> <span class="cn">FALSE</span>, <span class="at">value_col =</span> <span class="dv">1</span>, </span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>       <span class="at">quote_type =</span> <span class="st">&quot;single&quot;</span>, <span class="at">handle_nulls =</span> <span class="st">&quot;skip&quot;</span>, <span class="at">distinct =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
 <p><strong>Arguments</strong></p>
-<p><em>inputfile</em> R dataframe or path to the mapping file</p>
-<p><em>header</em> If reading a CSV file, specify TRUE if there is a
-header row, FALSE if there is no header row.</p>
-<p><strong>Value</strong></p>
-<p>A string that represents the constructed CASE statement</p>
+<ul>
+<li><code>inputfile</code> - R dataframe or path to mapping file</li>
+<li><code>value_col</code> - Column name/index for IN values (default:
+1)</li>
+<li><code>quote_type</code> - “single”, “double”, or “auto” (default:
+“single”)</li>
+<li><code>distinct</code> - Remove duplicates if TRUE (default:
+TRUE)</li>
+</ul>
+</div>
+<div id="updatetable---update-statement-generator" class="section level3">
+<h3><code>updatetable()</code> - UPDATE Statement Generator</h3>
+<p><strong>Description</strong></p>
+<p>Generates bulk UPDATE statements with flexible column selection and
+key specification.</p>
+<p><strong>Usage</strong></p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="fu">updatetable</span>(<span class="at">inputfile =</span> <span class="cn">NULL</span>, <span class="at">tablename =</span> <span class="cn">NULL</span>, <span class="at">key_col =</span> <span class="dv">1</span>, <span class="at">update_cols =</span> <span class="cn">NULL</span>,</span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>            <span class="at">quote_type =</span> <span class="st">&quot;auto&quot;</span>, <span class="at">handle_nulls =</span> <span class="st">&quot;skip&quot;</span>, <span class="at">batch_updates =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
+<p><strong>Arguments</strong></p>
+<ul>
+<li><code>inputfile</code> - R dataframe or path to mapping file</li>
+<li><code>tablename</code> - Name of SQL table to update</li>
+<li><code>key_col</code> - Column name/index for WHERE clause (default:
+1)</li>
+<li><code>update_cols</code> - Specific columns to update (default: all
+except key_col)</li>
+<li><code>quote_type</code> - “single”, “double”, or “auto” (default:
+“auto”)</li>
+</ul>
+</div>
+</div>
+<div id="common-parameters-explained" class="section level2">
+<h2>Common Parameters Explained</h2>
+<p><strong>Quote Types:</strong> - <code>&quot;single&quot;</code> - Use single
+quotes for all values: <code>&#39;value&#39;</code> - <code>&quot;double&quot;</code> -
+Use double quotes for all values: <code>&quot;value&quot;</code> -
+<code>&quot;auto&quot;</code> - Smart quoting: numeric values unquoted, text
+values single-quoted</p>
+<p><strong>NULL Handling:</strong> - <code>&quot;skip&quot;</code> - Skip
+rows/values with NA (default, safest) - <code>&quot;null&quot;</code> - Convert NA
+to SQL NULL in output - <code>&quot;error&quot;</code> - Stop execution when NA
+encountered</p>
 </div>
 <div id="installation" class="section level2">
 <h2>Installation</h2>
 <p>Install using:</p>
-<pre><code>devtools::install_github(&quot;leosonh/sqlcaser&quot;)</code></pre>
+<pre><code>devtools::install_github(&quot;leosonh/sqlcaseR&quot;)</code></pre>
 </div>
 <div id="acknowledgments" class="section level2">
 <h2>Acknowledgments</h2>
-<p>Much thanks to a couple of my colleagues at <a href="https://www.learningcollider.org/">Learning Collider</a> - Nitya
+<p>Much thanks to a couple of my prior colleagues at <a href="https://www.learningcollider.org/">Learning Collider</a> - Nitya
 Raviprakash and Jasmin Dial - who provided healthy discussion around my
 misery of constructing long SQL queries. Credit is also due to Kevin
-Flerlage, whose efforts in automating this process in Excel should be
-commended and partially inspired this package.</p>
+Flerlage, whose efforts in automating this process in Excel are
+commendable and partially inspired this package.</p>
 </div>
 <div id="citation-and-license" class="section level2">
 <h2>Citation and License</h2>
 <p>If desired, cite the package using:</p>
-<pre><code>citation(&quot;sqlcaser&quot;)</code></pre>
+<pre><code>citation(&quot;sqlcaseR&quot;)</code></pre>
 <p>License: MIT License</p>
 </div>
 

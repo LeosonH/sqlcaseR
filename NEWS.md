@@ -1,5 +1,17 @@
 # *News*
-# sqlcaseR 0.2 (2023-11-21)
+# sqlcaseR 0.2.1 (2025-9-8)
+
+* Added support for different quote types and NULL handling strategies
+* Implemented flexible column selection by name or index
+* File validation - check if files exist before reading
+* Input type validation - Ensure inputs are data frames or valid file paths
+* Data validation - Check for empty data, sufficient columns, valid column names
+* NA handling - Skip rows with NA values and warn users
+* SQL injection protection - Escape single quotes in string values
+* Better error messages - More descriptive error messages for troubleshooting
+* Graceful degradation - Continue processing when possible, skip problematic row
+
+# sqlcaseR 0.2.0 (2023-11-21)
 
 * New function! updatetable() creates a SQL UPDATE...SET...WHERE query from a
 CSV file or dataframe that includes the values to be updated in the SQL table.

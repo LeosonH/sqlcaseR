@@ -4,26 +4,41 @@
 \alias{updatetable}
 \title{Generate a SQL UPDATE statement from a mapping file}
 \usage{
-updatetable(inputfile = NULL, tablename = NULL)
+updatetable(
+  inputfile = NULL,
+  tablename = NULL,
+  key_col = 1,
+  update_cols = NULL,
+  quote_type = "auto",
+  handle_nulls = "skip",
+  batch_updates = TRUE
+)
 }
 \arguments{
 \item{inputfile}{Dataframe OR path to the mapping file}
 
 \item{tablename}{Name of the SQL table}
+
+\item{key_col}{Column name or index for WHERE clause key (default: 1)}
+
+\item{update_cols}{Vector of column names/indices to update (default: all except key_col)}
+
+\item{quote_type}{Type of quotes to use: "single", "double", or "auto" (default: "auto")}
+
+\item{handle_nulls}{How to handle NULL/NA values: "skip", "null", or "error" (default: "skip")}
+
+\item{batch_updates}{If TRUE, create one UPDATE per row; if FALSE, create one per column (default: TRUE)}
 }
 \value{
 A string that represents the constructed UPDATE statement(s)
 }
 \description{
-This function constructs an UPDATE statement from a mapping file or
-dataframe. It assumes that the first column of the data contains the
-key column and list of keys for the rows where the corresponding other columns
-have to be updated. It also assumes that the header for the data includes the
-column names. The function will generate one UPDATE statement for each row in
-the data.
+This function constructs UPDATE statements from a mapping file or
+dataframe. By default, it uses the first column as the key column for WHERE clauses,
+and updates all other columns. You can specify which columns to use.
 }
 \examples{
- input <- Data_Frame <- data.frame(Training = c("Strength", "Stamina",
-  "Other"), Pulse = c(100, 150, 120), Duration = c(60, 30, 45))
- result <- updatetable(inputfile = input, tablename = "myTable")
+ input <- data.frame(id = c(1, 2, 3), name = c("John", "Jane", "Bob"), 
+                     age = c(25, 30, 35))
+ result <- updatetable(input, "users", key_col = "id", update_cols = c("name", "age"))
 }

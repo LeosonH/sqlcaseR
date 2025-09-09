@@ -13,9 +13,9 @@ knitr::opts_chunk$set(
   comment = "#>"
 )
 ```
-**Version 0.2.0**
+**Version 0.2.1**
 
-***Leoson Hoay <br>21 Nov 2023***
+***Leoson Hoay <br>Last Updated: 8 Sep 2025 (0.2.0 -> 0.2.1)***
 
 
 ## Introduction
@@ -24,11 +24,13 @@ extremely long CASE WHEN...THEN statement to re-label categorical variables.
 It is most helpful for folks who intend to work with SQL directly in the R
 environment, likely with a SQL connector such as RODBC or RSQLite. 
 
-Instead of manually inputting WHENs and THENs to replace/map values, this
-library does it for you if you provide it with a mapping CSV file that contains
-the original values in the first column, and the values to map to in the second
-column. This version only supports CSV files for now, but support for other file
-formats is planned.
+The package provides three main functions for generating SQL statements:
+- **`casewhen()`** - Creates CASE WHEN...THEN statements for value mapping
+- **`inlist()`** - Creates IN() statements for filtering
+- **`updatetable()`** - Creates UPDATE statements for bulk data updates
+
+All functions now support flexible column selection, robust error handling, 
+different quote types, and various options for handling NULL/NA values.
 
 <br>
 Go from this:
@@ -53,9 +55,10 @@ CASE WHEN 'Hotel/Motel' THEN 'Living in Shelter/Hotel/Motel'
  WHEN 'Homeless, Doubled-Up' THEN 'Doubled Up'
 ```
 
-As of version 0.1.3, the package also supports the creation of long SQL IN()
-lists via the *inlist()* function. This was inspired by reading about Kevin
-Flerlage's [Excel implementation](https://www.flerlagetwins.com/2020/09/in-operator-generator-case-statement.html).  
+The package also supports the creation of long SQL IN() lists via the *inlist()* 
+function, and UPDATE statements via the *updatetable()* function. The IN() functionality 
+was inspired by reading about Kevin Flerlage's 
+[Excel implementation](https://www.flerlagetwins.com/2020/09/in-operator-generator-case-statement.html).  
 
 ## Demonstration
 
@@ -87,6 +90,71 @@ query <- paste("SELECT id, ", statement, " END AS status "," \nFROM table;")
 cat(query)
 ```
 
+## Advanced Examples
+
+### Using Named Columns and ELSE Clause
+
+```{r}
+# Create sample data with named columns
+data <- data.frame(
+  status = c("Active", "Inactive", "Pending"),
+  display = c("Currently Active", "Not Active", "Under Review")
+)
+
+# Use column names instead of positions, add ELSE clause
+advanced_case <- casewhen(data, 
+                         when_col = "status", 
+                         then_col = "display",
+                         else_value = "Unknown Status")
+```
+
+### Working with Numeric Data and Auto-Quoting
+
+```{r}
+# Create data with numeric values
+scores <- data.frame(
+  grade = c("A", "B", "C"),
+  points = c(90, 80, 70)
+)
+
+# Auto-quote mode handles numeric values without quotes
+numeric_case <- casewhen(scores, 
+                        when_col = "grade", 
+                        then_col = "points",
+                        quote_type = "auto")
+```
+
+### Creating IN Lists with Duplicate Removal
+
+```{r}
+# Create sample data with duplicates
+categories <- data.frame(
+  category = c("Sales", "Marketing", "Sales", "IT", "Marketing", "HR")
+)
+
+# Remove duplicates automatically
+unique_list <- inlist(categories, 
+                     value_col = "category",
+                     distinct = TRUE)
+```
+
+### Bulk UPDATE Statements
+
+```{r}
+# Create sample update data
+updates <- data.frame(
+  id = c(1, 2, 3),
+  name = c("John Doe", "Jane Smith", "Bob Wilson"),
+  department = c("Engineering", "Sales", "Marketing"),
+  salary = c(75000, 65000, 60000)
+)
+
+# Generate UPDATE statements using ID as key
+update_statements <- updatetable(updates, 
+                                tablename = "employees",
+                                key_col = "id")
+```
+
 ## Sample Data
 A sample mapping file is provided in this package. The file path can be accessed
 as follows:
@@ -95,79 +163,82 @@ as follows:
 samplepath <- system.file("extdata", "sample.csv", package = "sqlcaser")
 ```
 
-## Functions
+## Function Reference
 
-***casewhen()***
+### `casewhen()` - CASE Statement Generator
 
-**description**
+**Description**
 
-This function constructs a CASE WHEN THEN statement from a mapping CSV file or
-R dataframe. It assumes that the first column of the data contains the original
-WHEN values, and the second column contains the THEN values (the values
-to be mapped to.)
+Constructs CASE WHEN...THEN statements from mapping data with flexible column selection and robust options.
 
 **Usage**
 
-casewhen(inputfile=NULL, header=FALSE)
+```r
+casewhen(inputfile = NULL, header = FALSE, when_col = 1, then_col = 2, 
+         else_value = NULL, quote_type = "single", handle_nulls = "skip")
+```
 
 **Arguments**
 
-*inputfile* R dataframe or path to the mapping file
+- `inputfile` - R dataframe or path to mapping file
+- `when_col` - Column name/index for WHEN values (default: 1)
+- `then_col` - Column name/index for THEN values (default: 2)  
+- `else_value` - Optional ELSE value for the CASE statement
+- `quote_type` - "single", "double", or "auto" (default: "single")
+- `handle_nulls` - "skip", "null", or "error" (default: "skip")
 
-*header* If reading a CSV file, specify TRUE if there is a header row, FALSE if
-there is no header row.
+### `inlist()` - IN Statement Generator
 
-**Value**
+**Description**
 
-A string that represents the constructed CASE statement.
-
-<br>
-***inlist()***
-
-**description**
-
-This function constructs a IN statement from a mapping CSV file or
-R dataframe. It assumes that the first column of the data contains the vector of
-values that the IN statement will check against.
+Creates SQL IN() statements with duplicate removal and flexible column selection.
 
 **Usage**
 
-inlist(inputfile=NULL, header=FALSE)
+```r
+inlist(inputfile = NULL, header = FALSE, value_col = 1, 
+       quote_type = "single", handle_nulls = "skip", distinct = TRUE)
+```
 
 **Arguments**
 
-*inputfile* R dataframe or path to the mapping file
+- `inputfile` - R dataframe or path to mapping file
+- `value_col` - Column name/index for IN values (default: 1)
+- `quote_type` - "single", "double", or "auto" (default: "single")
+- `distinct` - Remove duplicates if TRUE (default: TRUE)
 
-*header* If reading a CSV file, specify TRUE if there is a header row, FALSE if
-there is no header row.
+### `updatetable()` - UPDATE Statement Generator
 
-**Value**
+**Description**
 
-A string that represents the constructed IN statement.
-
-<br>
-***updatetable()***
-
-**description**
-
-This function constructs an UPDATE statement from a mapping CSV file or
-R dataframe. It assumes that the first column of the data contains the key column
-and the keys to be checked against, and assumes that the rest of columns 
-contain the columns and values to be updated into the table.
+Generates bulk UPDATE statements with flexible column selection and key specification.
 
 **Usage**
 
-updatetable(inputfile=NULL, tablename=NULL)
+```r
+updatetable(inputfile = NULL, tablename = NULL, key_col = 1, update_cols = NULL,
+            quote_type = "auto", handle_nulls = "skip", batch_updates = TRUE)
+```
 
 **Arguments**
 
-*inputfile* R dataframe or path to the mapping file
+- `inputfile` - R dataframe or path to mapping file
+- `tablename` - Name of SQL table to update
+- `key_col` - Column name/index for WHERE clause (default: 1)
+- `update_cols` - Specific columns to update (default: all except key_col)
+- `quote_type` - "single", "double", or "auto" (default: "auto")
 
-*tablename* Name of the SQL table to be updated.
+## Common Parameters Explained
 
-**Value**
+**Quote Types:**
+- `"single"` - Use single quotes for all values: `'value'`
+- `"double"` - Use double quotes for all values: `"value"`
+- `"auto"` - Smart quoting: numeric values unquoted, text values single-quoted
 
-A string that represents the constructed UPDATE statement.
+**NULL Handling:**
+- `"skip"` - Skip rows/values with NA (default, safest)
+- `"null"` - Convert NA to SQL NULL in output
+- `"error"` - Stop execution when NA encountered
 
 
 ## Installation
@@ -179,10 +250,10 @@ devtools::install_github("leosonh/sqlcaseR")
 ```
 
 ## Acknowledgments
-Much thanks to a couple of my colleagues at [Learning Collider](https://www.learningcollider.org/) - Nitya Raviprakash
+Much thanks to a couple of my prior colleagues at [Learning Collider](https://www.learningcollider.org/) - Nitya Raviprakash
 and Jasmin Dial - who provided healthy discussion around my misery of
 constructing long SQL queries. Credit is also due to Kevin Flerlage, whose
-efforts in automating this process in Excel should be commended and partially
+efforts in automating this process in Excel are commendable and partially
 inspired this package.
 
 ## Citation and License

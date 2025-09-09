@@ -4,24 +4,38 @@
 \alias{inlist}
 \title{Generate a SQL IN statement from a mapping file}
 \usage{
-inlist(inputfile = NULL, header = FALSE)
+inlist(
+  inputfile = NULL,
+  header = FALSE,
+  value_col = 1,
+  quote_type = "single",
+  handle_nulls = "skip",
+  distinct = TRUE
+)
 }
 \arguments{
 \item{inputfile}{Dataframe OR path to the mapping file}
 
 \item{header}{If reading a csv file, TRUE if the file includes a header row,
 FALSE if it does not include a header row.}
+
+\item{value_col}{Column name or index for IN values (default: 1)}
+
+\item{quote_type}{Type of quotes to use: "single", "double", or "auto" (default: "single")}
+
+\item{handle_nulls}{How to handle NULL/NA values: "skip", "null", or "error" (default: "skip")}
+
+\item{distinct}{Remove duplicate values if TRUE (default: TRUE)}
 }
 \value{
-A string that represents the constructed CASE statement
+A string that represents the constructed IN statement
 }
 \description{
 This function constructs an IN statement from a mapping file or
-dataframe. It assumes that the first column of the data contains the
-list of values to check for.
+dataframe. By default it uses the first column, but you can specify
+a different column by name or index.
 }
 \examples{
- input <- Data_Frame <- data.frame(Training = c("Strength", "Stamina",
-  "Other"))
- result <- inlist(inputfile = input, header = TRUE)
+ input <- data.frame(Training = c("Strength", "Stamina", "Other"))
+ result <- inlist(inputfile = input, value_col = "Training")
 }

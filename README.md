@@ -1,8 +1,8 @@
 # sqlcaseR
 ## sqlcaseR: A long CASE WHEN THEN statement constructor for SQL interfaces in R
-**Version 0.2.0**
+**Version 0.2.1**
 
-***Leoson Hoay <br>21 Nov 2023***
+***Leoson Hoay <br>Last Updated: 9 Sep 2025 (0.2.0 to 0.2.1)***
 
 
 ## Introduction
@@ -89,21 +89,38 @@ samplepath <- system.file("extdata", "sample.csv", package = "sqlcaser")
 
 **description**
 
-This function constructs a CASE WHEN THEN statement from a mapping CSV file or
-R dataframe It assumes that the first column of the data contains the original
-WHEN values, and the second column contains the THEN values (the values
-to be mapped to.)
+This function constructs a CASE..WHEN..THEN statement from a mapping file or
+dataframe. By default, it uses the first column for WHEN values and second
+column for THEN values, but you can specify different columns.
 
 **Usage**
 
-casewhen(inputfile=NULL, header=FALSE)
+casewhen(
+  inputfile = NULL,
+  header = FALSE,
+  when_col = 1,
+  then_col = 2,
+  else_value = NULL,
+  quote_type = "single",
+  handle_nulls = "skip"
+)
 
 **Arguments**
 
-*inputfile* R dataframe or path to the mapping file
+*inputfile* Mapping dataframe OR path to the mapping file
 
-*header* If reading a CSV file, specify TRUE if there is a header row, FALSE if
-there is no header row.
+*header* If reading a csv file, TRUE if the file includes a header row,
+FALSE if it does not include a header row.
+
+*when_col* Column name or index for WHEN values (default: 1)
+
+*then_col* Column name or index for THEN values (default: 2)
+
+*else_value* Optional ELSE value for the CASE statement
+
+*quote_type* Type of quotes to use: "single", "double", or "auto" (default: "single")
+
+*handle_nulls* How to handle NULL/NA values: "skip", "null", or "error" (default: "skip")
 
 **Value**
 
@@ -114,13 +131,20 @@ A string that represents the constructed CASE statement
 
 **description**
 
-This function constructs a IN statement from a mapping CSV file or
-R dataframe. It assumes that the first column of the data contains the vector of
-values that the IN statement will check against.
+This function constructs an IN statement from a mapping file or
+dataframe. By default it uses the first column, but you can specify
+a different column by name or index.
 
 **Usage**
 
-inlist(inputfile=NULL, header=FALSE)
+inlist(
+  inputfile = NULL,
+  header = FALSE,
+  value_col = 1,
+  quote_type = "single",
+  handle_nulls = "skip",
+  distinct = TRUE
+)
 
 **Arguments**
 
@@ -128,6 +152,14 @@ inlist(inputfile=NULL, header=FALSE)
 
 *header* If reading a CSV file, specify TRUE if there is a header row, FALSE if
 there is no header row.
+
+*value_col* Column name or index for IN values (default: 1)
+
+*quote_type* Type of quotes to use: "single", "double", or "auto" (default: "single")
+
+*handle_nulls* How to handle NULL/NA values: "skip", "null", or "error" (default: "skip")
+
+*distinct* Remove duplicate values if TRUE (default: TRUE)
 
 **Value**
 
@@ -138,20 +170,37 @@ A string that represents the constructed IN statement.
 
 **description**
 
-This function constructs an UPDATE statement from a mapping CSV file or
-R dataframe. It assumes that the first column of the data contains the key column
-and the keys to be checked against, and assumes that the rest of columns 
-contain the columns and values to be updated into the table.
+This function constructs UPDATE statements from a mapping file or
+dataframe. By default, it uses the first column as the key column for WHERE clauses,
+and updates all other columns. You can specify which columns to use.
 
 **Usage**
 
-updatetable(inputfile=NULL, tablename=NULL)
+updatetable(
+  inputfile = NULL,
+  tablename = NULL,
+  key_col = 1,
+  update_cols = NULL,
+  quote_type = "auto",
+  handle_nulls = "skip",
+  batch_updates = TRUE
+)
 
 **Arguments**
 
 *inputfile* R dataframe or path to the mapping file
 
 *tablename* Name of the SQL table to be updated.
+
+*key_col* Column name or index for WHERE clause key (default: 1)}
+
+*update_cols* Vector of column names/indices to update (default: all except key_col)
+
+*quote_type* Type of quotes to use: "single", "double", or "auto" (default: "auto")
+
+*handle_nulls* How to handle NULL/NA values: "skip", "null", or "error" (default: "skip")
+
+*batch_updates* If TRUE, create one UPDATE per row; if FALSE, create one per column (default: TRUE)
 
 **Value**
 
@@ -167,10 +216,10 @@ devtools::install_github("leosonh/sqlcaser")
 ```
 
 ## Acknowledgments
-Much thanks to a couple of my colleagues at [Learning Collider](https://www.learningcollider.org/) - Nitya Raviprakash
+Much thanks to a couple of my prior colleagues at [Learning Collider](https://www.learningcollider.org/) - Nitya Raviprakash
 and Jasmin Dial - who provided healthy discussion around my misery of
 constructing long SQL queries. Credit is also due to Kevin Flerlage, whose
-efforts in automating this process in Excel should be commended and partially
+efforts in automating this process in Excel are commendable and partially
 inspired this package.
 
 ## Citation and License
