@@ -5,6 +5,8 @@ Date: 2025-9-8
 Authors@R: 
     person("Leoson", "Hoay", , "leoson.public@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "https://orcid.org/0000-0003-2079-5579"))
+Author: Leoson Hoay [aut, cre]  (ORCID: <https://orcid.org/0000-0003-2079-5579>)
+Maintainer: Leoson Hoay <leoson.public@gmail.com>
 Description: Includes built-in methods for generating long 'SQL' CASE statements,
              and other 'SQL' statements that may otherwise be arduous to construct
              by hand.The generated statement can easily be concatenated to string
